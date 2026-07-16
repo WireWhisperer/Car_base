@@ -3,5 +3,6 @@
 
 #include "clock.h"
 #include "oled_hardware_i2c.h"
+#include "Motor.h"
 
 #endif  /* #ifndef _MAIN_H_ */

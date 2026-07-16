@@ -10,6 +10,9 @@ int main(void)
     // OLED_Init();
     // WIT_Init();
     
+    Motor_Init();
+    Motor_SetBoth(0.4, 0.4);
+
     while (1) 
     {
         

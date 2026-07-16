@@ -9,27 +9,52 @@ void Motor_Init(void) {
 // 设置单个电机速度和方向,duty_desired取值为-1至1
 void Motor_Set(MotorId id, float duty_desired) 
 {
-    // 设置方向
+    float PWM_MOTOR_Counter_Compare_Value = 0;
+    
     if (duty_desired == 0)  //停止
     {
         DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
         DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_2_PIN);
         return;
     }
-    if (duty_desired < 0 )  //后退
+    switch (id)
     {
-        if (duty_desired < -1) duty_desired = -1;
-        DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
-        DL_GPIO_setPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
+        case MOTOR_LEFT:  //如果是左轮
+            // 设置方向
+            if (duty_desired < 0 )  //后退
+            {
+                if (duty_desired < -1) duty_desired = -1;
+                DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
+                DL_GPIO_setPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
+            }
+            else if (duty_desired > 0)  //前进
+            {
+                if (duty_desired > 1) duty_desired = 1;
+                DL_GPIO_setPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
+                DL_GPIO_clearPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
+            }
+            PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
+            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C0_IDX);
+            break;
+        case MOTOR_RIGHT:  //如果是右轮
+            // 设置方向
+            if (duty_desired < 0 )  //后退
+            {
+                if (duty_desired < -1) duty_desired = -1;
+                DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
+                DL_GPIO_setPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
+            }
+            else if (duty_desired > 0)  //前进
+            {
+                if (duty_desired > 1) duty_desired = 1;
+                DL_GPIO_setPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
+                DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
+            }
+            PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
+            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C1_IDX);
+            break;
     }
-    else if (duty_desired > 0)  //前进
-    {
-        if (duty_desired > 1) duty_desired = 1;
-        DL_GPIO_setPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
-        DL_GPIO_clearPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
-    }
-    float PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
-    DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C0_IDX);
+    
 }
 
 // 同时设置左右轮
