@@ -1,0 +1,68 @@
+# ==============================================
+# TI Code Composer Studio (CCS) — 编译中间文件
+# ==============================================
+
+# Debug 构建输出目录（包含 .out .map .d .linkInfo.xml 等所有编译产物）
+Debug/
+
+# 编译生成的目标文件
+*.obj
+*.o
+*.a
+*.lib
+
+# 链接器输出文件
+*.out
+*.hex
+*.bin
+*.elf
+*.map
+*.linkInfo.xml
+
+# 依赖文件（编译器自动生成的 .d 文件）
+*.d
+
+# CCS 生成的链接器脚本与选项文件
+device_linker.cmd
+device.cmd.genlibs
+device.opt
+ccsObjs.opt
+
+# Event graph（调试/分析中间文件）
+*.dot
+
+# SYSCFG 生成的文件（根据实际情况取消注释）
+# ti_msp_dl_config.c
+# ti_msp_dl_config.h
+# ti_mspm0_config.c
+# ti_mspm0_config.h
+
+# ==============================================
+# IDE / 编辑器
+# ==============================================
+
+# CCS 工作空间个人偏好（如果不需要共享 IDE 配置，取消注释下面几行）
+.ccsproject
+.cproject
+.project
+.settings/
+
+# .clangd 缓存（clangd 本地索引）
+.clangd/
+
+# Visual Studio Code
+.vscode/
+
+# ==============================================
+# 操作系统杂项
+# ==============================================
+
+# Windows
+Thumbs.db
+*.stackdump
+
+# macOS
+.DS_Store
+
+# Linux
+*~
