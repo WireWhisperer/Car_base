@@ -1,8 +1,14 @@
-#include "ti_msp_dl_config.h"
+
 #include "interrupt.h"
-#include "clock.h"
-#include "mpu6050.h"
-#include "wit.h"
+
+
+volatile uint8_t BUTTON_1_IS_PRESSED = 0;
+volatile uint8_t BUTTON_2_IS_PRESSED = 0;
+
+int16_t Motor_Left_roll = 0;
+int16_t Motor_Right_roll = 0;
+
+extern char buffer[100];
 
 void SysTick_Handler(void)
 {
@@ -101,6 +107,44 @@ void UART_WIT_INST_IRQHandler(void)
 
 void GROUP1_IRQHandler(void)
 {
+    uint32_t gpioA = DL_GPIO_getEnabledInterruptStatus(GPIOA,
+        GPIO_ENCODER_LEFT_A_PIN | GPIO_ENCODER_RIGHT_A_PIN | 
+        GPIO_BUTTON_PIN_1_PIN | GPIO_BUTTON_PIN_2_PIN);
+
+    if (gpioA & GPIO_BUTTON_PIN_1_PIN)
+    {
+        BUTTON_1_IS_PRESSED = 1;
+        DL_GPIO_clearInterruptStatus(GPIO_BUTTON_PORT,
+            GPIO_BUTTON_PIN_1_PIN);
+        // uart_pc_send_string("BUTTON_1 was pressed\r\n");
+    }
+    else if (gpioA & GPIO_BUTTON_PIN_2_PIN)
+    {
+        BUTTON_2_IS_PRESSED = 1;
+        DL_GPIO_clearInterruptStatus(GPIO_BUTTON_PORT,
+            GPIO_BUTTON_PIN_2_PIN);
+        // uart_pc_send_string("BUTTON_2 was pressed\r\n");
+    }
+    else if (gpioA & GPIO_ENCODER_LEFT_A_PIN)
+    {
+        Motor_Left_roll += (DL_GPIO_readPins(
+            GPIO_ENCODER_LEFT_B_PORT,
+            GPIO_ENCODER_LEFT_B_PIN) ? -1 : 1);
+        DL_GPIO_clearInterruptStatus(GPIO_BUTTON_PORT,
+            GPIO_ENCODER_LEFT_A_PIN);
+        //sprintf(buffer, "Left:%d", Motor_Left_roll);
+        //uart_pc_send_string(buffer);
+    }
+    else if (gpioA & GPIO_ENCODER_RIGHT_A_PIN)
+    {
+        Motor_Right_roll += (DL_GPIO_readPins(
+            GPIO_ENCODER_RIGHT_B_PORT,
+            GPIO_ENCODER_RIGHT_B_PIN) ? 1 : -1);
+        DL_GPIO_clearInterruptStatus(GPIO_BUTTON_PORT,
+            GPIO_ENCODER_RIGHT_A_PIN);
+        // sprintf(buffer, "Right:%d", Motor_Right_roll);
+        // uart_pc_send_string(buffer);
+    }
     switch (DL_Interrupt_getPendingGroup(DL_INTERRUPT_GROUP_1)) {
         /* MPU6050 INT */
         #if defined GPIO_MPU6050_PORT
@@ -114,5 +158,17 @@ void GROUP1_IRQHandler(void)
                 Read_Quad();
                 break;
         #endif
+    }
+}
+
+void Motor_PID_INST_IRQHandler(void)
+{
+    switch(DL_Timer_getPendingInterrupt(Motor_PID_INST))
+    {
+        case DL_TIMER_IIDX_LOAD:
+            calculate_Speed();
+            break;
+        default:
+            break;
     }
 }
