@@ -3,8 +3,12 @@
 extern int16_t Motor_Left_roll;
 extern int16_t Motor_Right_roll;
 
-float Moter_Left_Speed = 0;
-float Moter_Right_Speed = 0;
+const float kp = 0.1;
+const float ki = 0.005;
+const float duty_limit = 0.5; //占空比限幅
+
+Motor_PID_info Motor_Left_PID = {MOTOR_LEFT, 0, 0, 0, false};
+Motor_PID_info Motor_Right_PID = {MOTOR_RIGHT, 0, 0, 0, false};
 
 // 初始化电机相关外设
 void Motor_Init(void) {
@@ -18,8 +22,8 @@ void Motor_Init(void) {
     DL_TimerA_startCounter(Motor_PID_INST);
 }
 
-// 设置单个电机速度和方向,duty_desired取值为-1至1
-void Motor_Set(MotorId id, float duty_desired) 
+// 设置单个电机占空比和方向,duty_desired取值为-1至1
+void Motor_Set_Duty(MotorId id, float duty_desired) 
 {
     float PWM_MOTOR_Counter_Compare_Value = 0;
     
@@ -27,6 +31,8 @@ void Motor_Set(MotorId id, float duty_desired)
     {
         DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
         DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_2_PIN);
+        Motor_Left_PID.Current_Duty = 0;
+
         return;
     }
     switch (id)
@@ -35,16 +41,17 @@ void Motor_Set(MotorId id, float duty_desired)
             // 设置方向
             if (duty_desired < 0 )  //后退
             {
-                if (duty_desired < -1) duty_desired = -1;
+                if (duty_desired < -duty_limit) duty_desired = -duty_limit;
                 DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
                 DL_GPIO_setPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
             }
             else if (duty_desired > 0)  //前进
             {
-                if (duty_desired > 1) duty_desired = 1;
+                if (duty_desired > duty_limit) duty_desired = duty_limit;
                 DL_GPIO_setPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
                 DL_GPIO_clearPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
             }
+            Motor_Left_PID.Current_Duty = duty_desired;
             PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
             DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C0_IDX);
             break;
@@ -62,6 +69,7 @@ void Motor_Set(MotorId id, float duty_desired)
                 DL_GPIO_setPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
                 DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
             }
+            Motor_Right_PID.Current_Duty = duty_desired;
             PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
             DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C1_IDX);
             break;
@@ -69,21 +77,84 @@ void Motor_Set(MotorId id, float duty_desired)
     
 }
 
-// 同时设置左右轮
-void Motor_SetBoth(float left_duty_desired, float right_duty_desired) 
+// 同时设置左右轮占空比
+void Motor_Set_Duty_Both(float left_duty_desired, float right_duty_desired) 
 {     
-    Motor_Set(MOTOR_LEFT, left_duty_desired);
-    Motor_Set(MOTOR_RIGHT, right_duty_desired);
+    Motor_Set_Duty(MOTOR_LEFT, left_duty_desired);
+    Motor_Set_Duty(MOTOR_RIGHT, right_duty_desired);
 }
 
-//更新电机速度m/s根据电机转圈数
+void Motor_Set_Speed(MotorId id, float target_speed)
+{
+    if (!target_speed)
+    {
+        switch (id) 
+        {
+            case MOTOR_LEFT:
+                Motor_Left_PID.pid_en = false;
+                Motor_Left_PID.Target_Speed = 0;
+                break;
+            case MOTOR_RIGHT:
+                Motor_Right_PID.pid_en = false;
+                Motor_Right_PID.Target_Speed = 0;
+                break;
+        }
+        return;
+    }
+    switch (id)
+    {
+        case MOTOR_LEFT:
+            Motor_Left_PID.pid_en = true;
+            Motor_Left_PID.Target_Speed = target_speed;
+            break;
+        case MOTOR_RIGHT:
+            Motor_Right_PID.pid_en = true;
+            Motor_Right_PID.Target_Speed = target_speed;
+            break;
+    }
+}
+
+void Motor_Set_Speed_Both(float left_speed, float right_speed)
+{
+    Motor_Set_Speed(MOTOR_LEFT, left_speed);
+    Motor_Set_Speed(MOTOR_RIGHT, right_speed);
+}
+
+//更新电机速度mm/s根据电机转圈数
 void calculate_Speed(void)
 {
     float speed = 0;
     
-    Moter_Left_Speed = (float)Motor_Left_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
-    Moter_Right_Speed = (float)Motor_Right_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
+    Motor_Left_PID.Current_Speed = (float)Motor_Left_roll * TIRE_D * PI * 1000 / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
+    Motor_Right_PID.Current_Speed = (float)Motor_Right_roll * TIRE_D * PI * 1000 / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
 
     Motor_Left_roll = 0;
-    Moter_Right_roll = 0;
+    Motor_Right_roll = 0;
+}
+
+//使用增量式PID更新
+void Motor_PID_Update_Single(Motor_PID_info* info)
+{
+    if (info->pid_en)
+    {
+        float current_error = info->Target_Speed - info->Current_Speed;
+        info->Current_Duty += (float)(kp * (current_error - info->Last_error) + ki * current_error);
+        switch (info->id)
+        {
+            case MOTOR_LEFT:
+                Motor_Set_Duty(MOTOR_LEFT, info->Current_Duty);
+                break;
+            case MOTOR_RIGHT:
+                Motor_Set_Duty(MOTOR_RIGHT, info->Current_Duty);
+                break;
+        }
+        info->Last_error = current_error;
+    }
+}
+
+//增量式PID更新两电机
+void Motor_PID_Update_Both(void)
+{
+    Motor_PID_Update_Single(&Motor_Left_PID);
+    Motor_PID_Update_Single(&Motor_Right_PID);
 }

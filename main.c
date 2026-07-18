@@ -1,8 +1,9 @@
 #include "main.h"
 
 char buffer[100] = {0};
-extern float Moter_Left_Speed;
-extern float Moter_Right_Speed;
+
+extern Motor_PID_info Motor_Left_PID;
+extern Motor_PID_info Motor_Right_PID;
 
 int main(void)
 {
@@ -15,14 +16,18 @@ int main(void)
     // WIT_Init();
     
     Motor_Init();
-    Motor_SetBoth(0.3, 0.3);
+    Motor_Set_Speed_Both(500, 500);
 
     while (1) 
     {
-        sprintf(buffer, "LeftSpeed:%f\n", Moter_Left_Speed);
+        sprintf(buffer, "LeftSpeed:%f \n", Motor_Left_PID.Current_Speed);
         uart_pc_send_string(buffer);
-        sprintf(buffer, "RightSpeed:%f\n", Moter_Right_Speed);
+        sprintf(buffer, "Lefterror:%f \n", Motor_Left_PID.Last_error);
         uart_pc_send_string(buffer);
-        mspm0_delay_ms(1000);
+        sprintf(buffer, "RightSpeed:%f \n", Motor_Right_PID.Current_Speed);
+        uart_pc_send_string(buffer);
+        sprintf(buffer, "Righterror:%f \n", Motor_Right_PID.Last_error);
+        uart_pc_send_string(buffer);
+        mspm0_delay_ms(200);
     }
 }

@@ -167,6 +167,7 @@ void Motor_PID_INST_IRQHandler(void)
     {
         case DL_TIMER_IIDX_LOAD:
             calculate_Speed();
+            Motor_PID_Update_Both();
             break;
         default:
             break;
