@@ -4,8 +4,11 @@ extern int16_t Motor_Left_roll;
 extern int16_t Motor_Right_roll;
 
 const float kp = 0.1;
-const float ki = 0.005;
-const float duty_limit = 0.5; //占空比限幅
+const float ki = 0.025;
+const float duty_max = 0.5;  //正向占空比限幅
+const float duty_min = -0.0;  //反向占空比限幅
+
+extern char buffer[100];
 
 Motor_PID_info Motor_Left_PID = {MOTOR_LEFT, 0, 0, 0, false};
 Motor_PID_info Motor_Right_PID = {MOTOR_RIGHT, 0, 0, 0, false};
@@ -27,51 +30,53 @@ void Motor_Set_Duty(MotorId id, float duty_desired)
 {
     float PWM_MOTOR_Counter_Compare_Value = 0;
     
-    if (duty_desired == 0)  //停止
-    {
-        DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
-        DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_2_PIN);
-        Motor_Left_PID.Current_Duty = 0;
+    if (duty_desired > duty_max) duty_desired = duty_max;
+    if (duty_desired < duty_min) duty_desired = duty_min;
 
-        return;
-    }
     switch (id)
     {
         case MOTOR_LEFT:  //如果是左轮
             // 设置方向
             if (duty_desired < 0 )  //后退
             {
-                if (duty_desired < -duty_limit) duty_desired = -duty_limit;
                 DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
                 DL_GPIO_setPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
             }
             else if (duty_desired > 0)  //前进
             {
-                if (duty_desired > duty_limit) duty_desired = duty_limit;
                 DL_GPIO_setPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
+                DL_GPIO_clearPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
+            }
+            else 
+            {
+                DL_GPIO_clearPins(GPIO_MOTOR_LEFT_1_PORT, GPIO_MOTOR_LEFT_1_PIN);
                 DL_GPIO_clearPins(GPIO_MOTOR_LEFT_2_PORT, GPIO_MOTOR_LEFT_2_PIN);
             }
             Motor_Left_PID.Current_Duty = duty_desired;
             PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
-            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C0_IDX);
+            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C1_IDX);
             break;
         case MOTOR_RIGHT:  //如果是右轮
             // 设置方向
             if (duty_desired < 0 )  //后退
             {
-                if (duty_desired < -1) duty_desired = -1;
                 DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
                 DL_GPIO_setPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
             }
             else if (duty_desired > 0)  //前进
             {
-                if (duty_desired > 1) duty_desired = 1;
                 DL_GPIO_setPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
                 DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
             }
+            else
+            {
+                DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_1_PORT, GPIO_MOTOR_RIGHT_1_PIN);
+                DL_GPIO_clearPins(GPIO_MOTOR_RIGHT_2_PORT, GPIO_MOTOR_RIGHT_2_PIN);
+            }
+            
             Motor_Right_PID.Current_Duty = duty_desired;
             PWM_MOTOR_Counter_Compare_Value = PWM_MOTOR_Period_Count * fabsf(duty_desired);       
-            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C1_IDX);
+            DL_TimerG_setCaptureCompareValue(PWM_MOTOR_INST, PWM_MOTOR_Counter_Compare_Value, GPIO_PWM_MOTOR_C0_IDX);
             break;
     }
     
@@ -120,13 +125,13 @@ void Motor_Set_Speed_Both(float left_speed, float right_speed)
     Motor_Set_Speed(MOTOR_RIGHT, right_speed);
 }
 
-//更新电机速度mm/s根据电机转圈数
+//更新电机速度m/s根据电机转圈数
 void calculate_Speed(void)
 {
     float speed = 0;
     
-    Motor_Left_PID.Current_Speed = (float)Motor_Left_roll * TIRE_D * PI * 1000 / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
-    Motor_Right_PID.Current_Speed = (float)Motor_Right_roll * TIRE_D * PI * 1000 / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
+    Motor_Left_PID.Current_Speed = (float)Motor_Left_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
+    Motor_Right_PID.Current_Speed = (float)Motor_Right_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
 
     Motor_Left_roll = 0;
     Motor_Right_roll = 0;
@@ -138,17 +143,33 @@ void Motor_PID_Update_Single(Motor_PID_info* info)
     if (info->pid_en)
     {
         float current_error = info->Target_Speed - info->Current_Speed;
+
         info->Current_Duty += (float)(kp * (current_error - info->Last_error) + ki * current_error);
         switch (info->id)
         {
             case MOTOR_LEFT:
                 Motor_Set_Duty(MOTOR_LEFT, info->Current_Duty);
+                //调试
+                sprintf(buffer, "LeftSpeed:%f \n", Motor_Left_PID.Current_Speed);
+                uart_pc_send_string(buffer);
+                sprintf(buffer, "Lefterror:%f \n", Motor_Left_PID.Last_error);
+                uart_pc_send_string(buffer);
+                sprintf(buffer, "LeftDuty:%f \n", Motor_Left_PID.  Current_Duty);
+                uart_pc_send_string(buffer);
                 break;
             case MOTOR_RIGHT:
                 Motor_Set_Duty(MOTOR_RIGHT, info->Current_Duty);
+                //调试
+                sprintf(buffer, "RightSpeed:%f \n", Motor_Right_PID.Current_Speed);
+                uart_pc_send_string(buffer);
+                sprintf(buffer, "Righterror:%f \n", Motor_Right_PID.Last_error);
+                uart_pc_send_string(buffer);
+                sprintf(buffer, "RightDuty:%f \n", Motor_Right_PID.Current_Duty);
+                uart_pc_send_string(buffer);
                 break;
         }
         info->Last_error = current_error;
+
     }
 }
 

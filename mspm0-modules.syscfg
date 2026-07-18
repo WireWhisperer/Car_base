@@ -28,6 +28,7 @@ const TIMER  = scripting.addModule("/ti/driverlib/TIMER", {}, false);
 const TIMER1 = TIMER.addInstance();
 const UART   = scripting.addModule("/ti/driverlib/UART", {}, false);
 const UART1  = UART.addInstance();
+const UART2  = UART.addInstance();
 
 /**
  * Write custom configuration values to the imported modules.
@@ -165,6 +166,7 @@ TIMER1.timerClkPrescale = 100;
 TIMER1.interrupts       = ["LOAD"];
 
 UART1.$name                            = "UART_PC";
+UART1.targetBaudRate                   = 115200;
 UART1.peripheral.$assign               = "UART0";
 UART1.peripheral.rxPin.$assign         = "PA11";
 UART1.peripheral.txPin.$assign         = "PA10";
@@ -177,6 +179,20 @@ UART1.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric5";
 UART1.rxPinConfig.hideOutputInversion  = scripting.forceWrite(false);
 UART1.rxPinConfig.onlyInternalResistor = scripting.forceWrite(false);
 UART1.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+
+UART2.$name                            = "UART_SPP";
+UART2.peripheral.$assign               = "UART1";
+UART2.peripheral.rxPin.$assign         = "PA18";
+UART2.peripheral.txPin.$assign         = "PA17";
+UART2.txPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric6";
+UART2.txPinConfig.direction            = scripting.forceWrite("OUTPUT");
+UART2.txPinConfig.hideOutputInversion  = scripting.forceWrite(false);
+UART2.txPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+UART2.txPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+UART2.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric7";
+UART2.rxPinConfig.hideOutputInversion  = scripting.forceWrite(false);
+UART2.rxPinConfig.onlyInternalResistor = scripting.forceWrite(false);
+UART2.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
 
 const ProjectConfig              = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);
 ProjectConfig.migrationCondition = true;

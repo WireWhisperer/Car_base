@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include "ti_msp_dl_config.h"
 #include "math.h"
+#include <stdio.h>
+#include "UART_tools.h"
 
 #define PWM_MOTOR_Period_Count 1000  //PWM总计数
 #define TIRE_D 48.5  //轮胎直径(单位mm)
@@ -37,7 +39,7 @@ void Motor_Set_Speed(MotorId id, float target_speed);
 // 同时设置左右轮速度
 void Motor_Set_Speed_Both(float left_speed, float right_speed);
 
-//更新电机速度mm/s根据电机转圈数
+//更新电机速度m/s根据电机转圈数
 void calculate_Speed(void);
 //使用增量式PID更新
 void Motor_PID_Update_Single(Motor_PID_info* info);
