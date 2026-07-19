@@ -3,8 +3,8 @@
 extern int16_t Motor_Left_roll;
 extern int16_t Motor_Right_roll;
 
-const float kp = 0.1;
-const float ki = 0.025;
+const float kp = 0.05;
+const float ki = 0.02;
 const float duty_max = 0.5;  //正向占空比限幅
 const float duty_min = -0.0;  //反向占空比限幅
 
