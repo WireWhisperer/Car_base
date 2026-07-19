@@ -127,11 +127,7 @@ uint8_t Get_Gray_Data(void)
     return ret;
 }
 
-/*===========================================================================
- * 循迹算法
- *===========================================================================*/
-
-double get_track(Track_Clock dir)
+double get_miss_theta(Track_Clock dir)
 {
     uint8_t D[8] = {0};
     uint8_t gray_status = Get_Gray_Data();

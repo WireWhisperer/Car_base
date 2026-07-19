@@ -133,6 +133,6 @@ uint8_t Get_Gray_Data(void);
  * @param  dir  循迹方向 (Clockwise = 顺时针, Anticlockwise = 逆时针)
  * @return 偏差角度 (度), 范围 [-11°, +11°]
  */
-double get_track(Track_Clock dir);
+double get_miss_theta(Track_Clock dir);
 
 #endif /* GREY_WITH_MCU_H */
