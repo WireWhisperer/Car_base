@@ -17,7 +17,7 @@ int main(void)
     // WIT_Init();
 
     Motor_Init();
-    Motor_Set_Speed_Both(0.0, 0.0);
+    Motor_Set_Speed_Both(0.4, 0.4);
 
 
     while (1)

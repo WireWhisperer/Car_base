@@ -42,10 +42,10 @@ ccsObjs.opt
 # ==============================================
 
 # CCS 工作空间个人偏好（如果不需要共享 IDE 配置，取消注释下面几行）
-.ccsproject
-.cproject
-.project
-.settings/
+# .ccsproject
+ #.cproject
+ #.project
+# .settings/
 
 # .clangd 缓存（clangd 本地索引）
 .clangd/
