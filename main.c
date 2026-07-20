@@ -26,8 +26,8 @@ int main(void)
     {
         //double miss = get_miss_theta(Clockwise);
 
-        sprintf((char*)buffer, "yaw=%lf \r\n", g_gyro_yaw );
-        uart_pc_send_string(buffer);
-        mspm0_delay_ms(200);
+        //sprintf((char*)buffer, "yaw=%lf \r\n", g_gyro_yaw );
+        //uart_pc_send_string(buffer);
+        //mspm0_delay_ms(200);
     }
 }

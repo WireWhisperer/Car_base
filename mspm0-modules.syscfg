@@ -198,18 +198,21 @@ UART1.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric5";
 
 UART2.$name                            = "UART_Gyro";
 UART2.targetBaudRate                   = 115200;
-UART2.peripheral.$assign               = "UART3";
-UART2.peripheral.rxPin.$assign         = "PA13";
-UART2.peripheral.txPin.$assign         = "PA14";
-UART2.txPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric6";
-UART2.txPinConfig.direction            = scripting.forceWrite("OUTPUT");
-UART2.txPinConfig.hideOutputInversion  = scripting.forceWrite(false);
-UART2.txPinConfig.onlyInternalResistor = scripting.forceWrite(false);
-UART2.txPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+UART2.enableFIFO                       = true;
+UART2.direction                        = "RX";
+UART2.rxTimeoutValue                   = 1;
+UART2.enabledInterrupts                = ["RX_TIMEOUT_ERROR"];
+UART2.enabledDMARXTriggers             = "DL_UART_DMA_INTERRUPT_RX";
 UART2.rxPinConfig.$name                = "ti_driverlib_gpio_GPIOPinGeneric9";
 UART2.rxPinConfig.hideOutputInversion  = scripting.forceWrite(false);
 UART2.rxPinConfig.onlyInternalResistor = scripting.forceWrite(false);
 UART2.rxPinConfig.passedPeripheralType = scripting.forceWrite("Digital");
+UART2.peripheral.$assign               = "UART3";
+UART2.peripheral.rxPin.$assign         = "PA13";
+UART2.DMA_CHANNEL_RX.$name             = "DMA_Gyro";
+UART2.DMA_CHANNEL_RX.addressMode       = "f2b";
+UART2.DMA_CHANNEL_RX.srcLength         = "BYTE";
+UART2.DMA_CHANNEL_RX.dstLength         = "BYTE";
 
 const ProjectConfig              = scripting.addModule("/ti/project_config/ProjectConfig", {}, false);
 ProjectConfig.migrationCondition = true;
@@ -219,4 +222,5 @@ ProjectConfig.migrationCondition = true;
  * version of the tool will not impact the pinmux you originally saw.  These lines can be completely deleted in order to
  * re-solve from scratch.
  */
-TIMER1.peripheral.$suggestSolution = "TIMA0";
+TIMER1.peripheral.$suggestSolution               = "TIMA0";
+UART2.DMA_CHANNEL_RX.peripheral.$suggestSolution = "DMA_CH0";

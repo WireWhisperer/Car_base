@@ -1,5 +1,7 @@
 #include "Trace.h"
 
+extern float g_gyro_yaw;
+
 //新思路循迹
 void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, float speed_add, float yaw_current)
 {
@@ -16,7 +18,7 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
     while(1)
     {
         angle_miss = get_miss_theta(spin_dir);
-        //yaw_missed = yaw_target - yaw;
+        yaw_missed = yaw_target - g_gyro_yaw;
 
         if (yaw_missed > 180) yaw_missed -= 360;
         if (yaw_missed < -180) yaw_missed += 360;
@@ -34,7 +36,7 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
         //sprintf((char*)oled_buffer, "miss: %f", yaw_missed);
         //OLED_ShowString(0, 2, oled_buffer, 8);
         
-        /*借助陀螺仪判断是否快出线
+        //借助陀螺仪判断是否快出线
         if ((yaw_missed > -10) && (yaw_missed < 10))
         {
             if ((Get_Gray_Data() == 0xff)) break;
@@ -48,7 +50,7 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
                 mspm0_delay_ms(100);
             }
         }
-        */
+        
 
         mspm0_delay_ms(10);
     }

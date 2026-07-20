@@ -4,21 +4,34 @@
  * ============================================================
  *
  *  硬件平台: TI MSPM0G3507
- *  通信接口: UART_Gyro (UART3, PA13=RX, PA14=TX), 115200-8N1
+ *  通信接口: UART_Gyro (UART3, PA13=RX), 115200-8N1
+ *            RX-only + FIFO + DMA (DMA_Gyro) + RX timeout 中断
  *
- *  调试方法: 在 CCS Debug 中观察全局变量:
- *    - g_gyro_dbg_isr_cnt  = 0 → ISR 未触发 (中断/NVIC 问题)
- *    - g_gyro_dbg_byte_cnt = 0 → RX 未收到任何字节 (接线/波特率)
- *    - g_gyro_dbg_err_cnt  > 0 → 有数据但不是有效帧 (协议不匹配)
- *    - g_gyro_dbg_frame_cnt = 0 → 无有效角度帧
- *    - g_gyro_dbg_buf_snap  → 查看陀螺仪实际发来的数据格式
+ *  与 WIT/BNO08X 相同的 DMA 接收架构:
+ *    - DMA 固定地址 (UART RXDATA) → 块地址 (gyro_dmaBuffer)
+ *    - RX timeout 中断触发 ISR 解析数据
+ *
+ *  数据手册协议帧格式 (11字节):
+ *   ┌──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┐
+ *   │ [0]  │ [1]  │ [2]  │ [3]  │ [4]  │ [5]  │ [6]  │ [7]  │ [8]  │ [9]  │ [10] │
+ *   │ 0x5A │ TYPE │ DL0  │ DH0  │ DL1  │ DH1  │ DL2  │ DH2  │ DL3  │ DH3  │ SUM  │
+ *   └──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┴──────┘
+ *   类型 0xBB (角度帧): 数据0=Roll, 数据1=Pitch, 数据2=Yaw, 数据3=保留
+ *
+ *  注意: 当前 UART_Gyro 为 RX-only, 无法发送校准命令。
+ *        如需校准功能, SysConfig 中 direction 改为 "TX and RX" 并连接 TX 引脚。
  * ------------------------------------------------------------
  */
 
 #include "Gyroscope.h"
 #include "ti_msp_dl_config.h"
-#include "clock.h"
-#include <string.h>
+
+/*============================================================================
+ * DMA 接收缓冲区 — 33 字节 (3 × 11 字节帧)
+ * DMA 传输 32 字节, 留 1 字节余量给 ISR 中 FIFO 残留读取
+ *===========================================================================*/
+
+uint8_t gyro_dmaBuffer[33];
 
 /*============================================================================
  * 全局变量 — 姿态角 (ISR 中实时更新)
@@ -29,192 +42,150 @@ float g_gyro_pitch = 0.0f;
 float g_gyro_roll  = 0.0f;
 
 /*============================================================================
- * 全局变量 — 调试计数器 (Debug 中观察用)
+ * 全局变量 — 调试计数器
  *===========================================================================*/
 
-volatile uint16_t g_gyro_dbg_isr_cnt   = 0;   /**< ISR 进入次数 */
-volatile uint16_t g_gyro_dbg_byte_cnt  = 0;   /**< FeedByte 调用次数 */
-volatile uint16_t g_gyro_dbg_frame_cnt = 0;   /**< 有效帧解析次数 */
-volatile uint16_t g_gyro_dbg_err_cnt   = 0;   /**< 帧校验失败次数 */
-volatile uint8_t  g_gyro_dbg_last_byte = 0;   /**< 最后收到的原始字节 */
-volatile uint8_t  g_gyro_dbg_rx_idx    = 0;   /**< 当前接收缓冲区索引 */
-volatile uint8_t  g_gyro_dbg_buf_snap[3] = {0, 0, 0};  /**< 收满11字节时的前3字节快照 */
+volatile uint16_t g_gyro_dbg_isr_cnt   = 0;
+volatile uint16_t g_gyro_dbg_frame_cnt = 0;
+volatile uint16_t g_gyro_dbg_err_cnt   = 0;
+volatile uint8_t  g_gyro_dbg_rx_size   = 0;
+volatile uint8_t  g_gyro_dbg_buf_snap[3] = {0, 0, 0};
 
 /*============================================================================
  * 协议常量
  *===========================================================================*/
 
-#define FRAME_HEADER         0x5AU
-#define FRAME_TYPE_ANGLE     0xBBU
-#define FRAME_LEN            11
+#define FRAME_HEADER          0x5AU
+#define FRAME_TYPE_ANGLE      0xBBU
+#define FRAME_LEN             11
 
-#define ANGLE_SCALE_DIVISOR  32768.0f
-#define ANGLE_RANGE_DEGREES  180.0f
-
-/*============================================================================
- * 模块内部状态
- *===========================================================================*/
-
-static uint8_t  s_rx_buf[FRAME_LEN];
-static uint8_t  s_rx_idx = 0;
+#define ANGLE_SCALE_DIVISOR   32768.0f
+#define ANGLE_RANGE_DEGREES   180.0f
+#define DMA_TRANSFER_SIZE     32
 
 /*============================================================================
- * 内部工具函数
+ * 公共 API
  *===========================================================================*/
 
-static inline int16_t merge_bytes_le(uint8_t low, uint8_t high)
-{
-    return (int16_t)(((uint16_t)high << 8) | (uint16_t)low);
-}
-
-static inline float raw_to_angle(int16_t raw)
-{
-    return (float)raw / ANGLE_SCALE_DIVISOR * ANGLE_RANGE_DEGREES;
-}
-
-static void send_command(const uint8_t cmd[5])
-{
-    for (int i = 0; i < 5; i++) {
-        DL_UART_transmitDataBlocking(UART_Gyro_INST, cmd[i]);
-    }
-}
-
-/*============================================================================
- * 数据帧解析器
- *===========================================================================*/
-
-void Gyroscope_FeedByte(uint8_t byte)
-{
-    g_gyro_dbg_byte_cnt++;          /* 调试: 收到的总字节数 */
-    g_gyro_dbg_last_byte = byte;    /* 调试: 记录最后收到的字节 */
-
-    s_rx_buf[s_rx_idx++] = byte;
-
-    /* 帧头校验 */
-    if (s_rx_buf[0] != FRAME_HEADER) {
-        g_gyro_dbg_err_cnt++;       /* 调试: 帧头错误 */
-        s_rx_idx = 0;
-        goto update_debug;
-    }
-
-    /* 等待收满 11 字节 */
-    if (s_rx_idx < FRAME_LEN) {
-        goto update_debug;
-    }
-
-    /* 仅处理角度帧 */
-    if (s_rx_buf[1] != FRAME_TYPE_ANGLE) {
-        g_gyro_dbg_err_cnt++;       /* 调试: 非角度帧类型 */
-        s_rx_idx = 0;
-        goto update_debug;
-    }
-
-    /* 校验和 */
-    {
-        uint8_t sum = 0;
-        for (int i = 0; i < 10; i++) {
-            sum += s_rx_buf[i];
-        }
-        if (sum != s_rx_buf[10]) {
-            g_gyro_dbg_err_cnt++;   /* 调试: 校验和失败 */
-            s_rx_idx = 0;
-            goto update_debug;
-        }
-    }
-
-    /* 解析角度 */
-    {
-        int16_t raw_roll  = merge_bytes_le(s_rx_buf[2], s_rx_buf[3]);
-        int16_t raw_pitch = merge_bytes_le(s_rx_buf[4], s_rx_buf[5]);
-        int16_t raw_yaw   = merge_bytes_le(s_rx_buf[6], s_rx_buf[7]);
-
-        g_gyro_roll  = raw_to_angle(raw_roll);
-        g_gyro_pitch = raw_to_angle(raw_pitch);
-        g_gyro_yaw   = raw_to_angle(raw_yaw);
-
-        g_gyro_dbg_frame_cnt++;     /* 调试: 成功解析一帧 */
-
-        /* 调试: 保存成功帧的前3字节快照 */
-        g_gyro_dbg_buf_snap[0] = s_rx_buf[0];
-        g_gyro_dbg_buf_snap[1] = s_rx_buf[1];
-        g_gyro_dbg_buf_snap[2] = s_rx_buf[2];
-    }
-
-    s_rx_idx = 0;
-
-update_debug:
-    /* 调试: 导出当前 rx_idx (即使出错退出, 也保留状态供分析) */
-    g_gyro_dbg_rx_idx = s_rx_idx;
-    /* 持续更新快照的前3字节 */
-    g_gyro_dbg_buf_snap[0] = s_rx_buf[0];
-    g_gyro_dbg_buf_snap[1] = s_rx_buf[1];
-    g_gyro_dbg_buf_snap[2] = s_rx_buf[2];
-}
-
-/*============================================================================
- * 公共 API 实现
- *===========================================================================*/
-
+/**
+ * @brief 初始化陀螺仪 DMA 接收
+ *
+ * 与 WIT_Init() / BNO08X_Init() 完全相同的模式:
+ *   1. 清零全局变量和调试计数器
+ *   2. 配置 DMA 通道: 固定地址 (UART RXDATA) → 块地址 (gyro_dmaBuffer)
+ *   3. 使能 NVIC 中断
+ *
+ * @note UART 外设初始化 (FIFO/波特率/DMA触发/RX timeout中断) 已由
+ *       SYSCFG_DL_UART_Gyro_init() 完成。
+ */
 void Gyroscope_Init(void)
 {
-    /* 清零内部状态 */
-    memset(s_rx_buf, 0, sizeof(s_rx_buf));
-    s_rx_idx       = 0;
-    g_gyro_yaw     = 0.0f;
-    g_gyro_pitch   = 0.0f;
-    g_gyro_roll    = 0.0f;
+    /* 清零姿态数据 */
+    g_gyro_yaw   = 0.0f;
+    g_gyro_pitch = 0.0f;
+    g_gyro_roll  = 0.0f;
 
     /* 清零调试计数器 */
     g_gyro_dbg_isr_cnt   = 0;
-    g_gyro_dbg_byte_cnt  = 0;
     g_gyro_dbg_frame_cnt = 0;
     g_gyro_dbg_err_cnt   = 0;
-    g_gyro_dbg_last_byte = 0;
-    g_gyro_dbg_rx_idx    = 0;
+    g_gyro_dbg_rx_size   = 0;
+    g_gyro_dbg_buf_snap[0] = 0;
+    g_gyro_dbg_buf_snap[1] = 0;
+    g_gyro_dbg_buf_snap[2] = 0;
 
-    /* 使能 UART RX 中断 (与 UART_tools.c 中 uart_pc_Init 相同模式) */
-    DL_UART_enableInterrupt(UART_Gyro_INST, DL_UART_INTERRUPT_RX);
-    NVIC_ClearPendingIRQ(UART_Gyro_INST_INT_IRQN);
+    /* 配置 DMA: UART RX FIFO → gyro_dmaBuffer (与 WIT/BNO08X 相同模式) */
+    DL_DMA_setSrcAddr(DMA, DMA_Gyro_CHAN_ID,
+        (uint32_t)(&UART_Gyro_INST->RXDATA));
+    DL_DMA_setDestAddr(DMA, DMA_Gyro_CHAN_ID,
+        (uint32_t)&gyro_dmaBuffer[0]);
+    DL_DMA_setTransferSize(DMA, DMA_Gyro_CHAN_ID, DMA_TRANSFER_SIZE);
+    DL_DMA_enableChannel(DMA, DMA_Gyro_CHAN_ID);
+
+    /* 使能 NVIC 中断
+     * (UART 外设层的 RX timeout 中断已由 SysConfig 生成代码使能) */
     NVIC_EnableIRQ(UART_Gyro_INST_INT_IRQN);
-
-    /* 发送校准序列 */
-    Gyroscope_CalibrateZero();
-}
-
-void Gyroscope_CalibrateZero(void)
-{
-    static const uint8_t CMD_UNLOCK[5]   = {0x55, 0xAA, 0x13, 0x8E, 0x5F};
-    static const uint8_t CMD_YAW_ZERO[5] = {0x55, 0xAA, 0x0A, 0x04, 0x00};
-    static const uint8_t CMD_SAVE[5]     = {0x55, 0xAA, 0x00, 0x00, 0x00};
-
-    send_command(CMD_UNLOCK);
-    mspm0_delay_ms(100);
-
-    send_command(CMD_YAW_ZERO);
-    mspm0_delay_ms(100);
-
-    send_command(CMD_SAVE);
-    mspm0_delay_ms(100);
 }
 
 /*============================================================================
- * UART_Gyro 中断服务程序
- *  (API 调用与 UART_tools.c 中 UART_PC_INST_IRQHandler 完全一致)
+ * UART_Gyro 中断服务程序 — DMA + RX timeout
+ *
+ * 触发条件: RX 空闲超过 1 字节时间 (rxTimeoutValue=1)
+ * 处理逻辑: 与 WIT/BNO08X ISR 完全相同的 DMA 环形接收模式
  *===========================================================================*/
 
+#if defined(UART_Gyro_INST_IRQHandler)
 void UART_Gyro_INST_IRQHandler(void)
 {
-    g_gyro_dbg_isr_cnt++;   /* 调试: ISR 每进入一次就加 1 */
+    uint8_t checkSum;
+    uint8_t packCnt = 0;
 
-    switch (DL_UART_getPendingInterrupt(UART_Gyro_INST)) {
-        case DL_UART_IIDX_RX:
-            {
-                uint8_t rx_byte = DL_UART_Main_receiveData(UART_Gyro_INST);
-                Gyroscope_FeedByte(rx_byte);
-            }
-            break;
+    g_gyro_dbg_isr_cnt++;   /* 调试: ISR 进入计数 */
 
-        default:
-            break;
+    /* 1. 停 DMA, 计算本次收到多少字节 */
+    DL_DMA_disableChannel(DMA, DMA_Gyro_CHAN_ID);
+    uint8_t rxSize = DMA_TRANSFER_SIZE
+                     - DL_DMA_getTransferSize(DMA, DMA_Gyro_CHAN_ID);
+
+    /* 2. 检查 FIFO 中是否还有残留字节 */
+    if (DL_UART_isRXFIFOEmpty(UART_Gyro_INST) == false) {
+        gyro_dmaBuffer[rxSize++] = DL_UART_receiveData(UART_Gyro_INST);
     }
+
+    g_gyro_dbg_rx_size = rxSize;    /* 调试: 记录本次收了多少字节 */
+
+    /* 3. 以 11 字节为单位解析帧 */
+    while (rxSize >= FRAME_LEN) {
+        uint8_t *pkt = &gyro_dmaBuffer[packCnt * FRAME_LEN];
+
+        /* 3a. 校验和 */
+        checkSum = 0;
+        for (int i = 0; i < FRAME_LEN - 1; i++) {
+            checkSum += pkt[i];
+        }
+
+        /* 3b. 帧头 + 类型 + 校验和 三重验证 */
+        if ((pkt[0] == FRAME_HEADER) &&
+            (pkt[1] == FRAME_TYPE_ANGLE) &&
+            (checkSum == pkt[10])) {
+
+            /* 3c. 解析 Roll / Pitch / Yaw (小端序) */
+            int16_t raw_roll  = (int16_t)((pkt[3] << 8) | pkt[2]);
+            int16_t raw_pitch = (int16_t)((pkt[5] << 8) | pkt[4]);
+            int16_t raw_yaw   = (int16_t)((pkt[7] << 8) | pkt[6]);
+
+            g_gyro_roll  = (float)raw_roll  / ANGLE_SCALE_DIVISOR * ANGLE_RANGE_DEGREES;
+            g_gyro_pitch = (float)raw_pitch / ANGLE_SCALE_DIVISOR * ANGLE_RANGE_DEGREES;
+            g_gyro_yaw   = (float)raw_yaw   / ANGLE_SCALE_DIVISOR * ANGLE_RANGE_DEGREES;
+
+            g_gyro_dbg_frame_cnt++;     /* 调试: 有效帧 +1 */
+            g_gyro_dbg_buf_snap[0] = pkt[0];
+            g_gyro_dbg_buf_snap[1] = pkt[1];
+            g_gyro_dbg_buf_snap[2] = pkt[2];
+        } else {
+            g_gyro_dbg_err_cnt++;       /* 调试: 无效帧 +1 */
+            /* 保存第一个无效帧的前3字节供诊断 */
+            if (g_gyro_dbg_err_cnt == 1) {
+                g_gyro_dbg_buf_snap[0] = pkt[0];
+                g_gyro_dbg_buf_snap[1] = pkt[1];
+                g_gyro_dbg_buf_snap[2] = pkt[2];
+            }
+        }
+
+        rxSize -= FRAME_LEN;
+        packCnt++;
+    }
+
+    /* 4. 清空 FIFO 中残留字节 */
+    {
+        uint8_t dummy[4];
+        DL_UART_drainRXFIFO(UART_Gyro_INST, dummy, 4);
+    }
+
+    /* 5. 重新启动 DMA */
+    DL_DMA_setDestAddr(DMA, DMA_Gyro_CHAN_ID,
+        (uint32_t)&gyro_dmaBuffer[0]);
+    DL_DMA_setTransferSize(DMA, DMA_Gyro_CHAN_ID, DMA_TRANSFER_SIZE);
+    DL_DMA_enableChannel(DMA, DMA_Gyro_CHAN_ID);
 }
+#endif  /* UART_Gyro_INST_IRQHandler */
