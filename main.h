@@ -21,5 +21,6 @@
 #include "UART_tools.h"
 #include <stdio.h>
 #include "gray_with_MCU.h"
+#include "Gyroscope.h"
 
 #endif  /* #ifndef _MAIN_H_ */

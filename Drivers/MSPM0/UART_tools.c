@@ -3,7 +3,6 @@
 volatile unsigned char uart_data = 0;
 float yaw = 0.f;
 
-//初始化PC的TypeC串口
 void uart_pc_Init(void)
 {
     SYSCFG_DL_init();

@@ -2,6 +2,8 @@
 
 extern int16_t Motor_Left_roll;
 extern int16_t Motor_Right_roll;
+extern int16_t Motor_Left_Journey;
+extern int16_t Motor_Right_Journey;
 
 const float kp = 0.05;
 const float ki = 0.02;
@@ -125,13 +127,18 @@ void Motor_Set_Speed_Both(float left_speed, float right_speed)
     Motor_Set_Speed(MOTOR_RIGHT, right_speed);
 }
 
-//更新电机速度m/s根据电机转圈数
+//更新电机速度m/s及总路程mm根据电机转圈数
 void calculate_Speed(void)
 {
     float speed = 0;
-    
-    Motor_Left_PID.Current_Speed = (float)Motor_Left_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
-    Motor_Right_PID.Current_Speed = (float)Motor_Right_roll * TIRE_D * PI / PID_TIMER_PERIOD / ENCODER_WIRE_COUNT; 
+    float inc_left_journey = (float)Motor_Left_roll * TIRE_D * PI / ENCODER_WIRE_COUNT;  //单位毫米
+    float inc_right_journey = (float)Motor_Right_roll * TIRE_D * PI / ENCODER_WIRE_COUNT;  //单位毫米
+
+    Motor_Left_Journey += inc_left_journey;
+    Motor_Right_Journey += inc_right_journey;
+
+    Motor_Left_PID.Current_Speed = inc_left_journey / PID_TIMER_PERIOD; 
+    Motor_Right_PID.Current_Speed = inc_right_journey / PID_TIMER_PERIOD; 
 
     Motor_Left_roll = 0;
     Motor_Right_roll = 0;
