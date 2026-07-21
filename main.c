@@ -6,6 +6,7 @@ extern Motor_PID_info Motor_Left_PID;
 extern Motor_PID_info Motor_Right_PID;
 
 extern float g_gyro_yaw;
+extern uint8_t BUTTON_1_IS_PRESSED;
 
 int main(void)
 {
@@ -19,8 +20,18 @@ int main(void)
     // WIT_Init();
 
     Motor_Init();
+
+    DL_GPIO_enableInterrupt(GPIOA, GPIO_BUTTON_PIN_1_PIN | GPIO_BUTTON_PIN_2_PIN); 
     //Motor_Set_Speed_Both(0.4, 0.4);
     Gyroscope_Init();
+
+    while(!BUTTON_1_IS_PRESSED);
+
+    Rotate(Clockwise, 0.0, g_gyro_yaw+90);
+
+    Motor_Set_Speed_Both(0, 0);
+    
+    BUTTON_1_IS_PRESSED = 0;
 
     while (1)
     {

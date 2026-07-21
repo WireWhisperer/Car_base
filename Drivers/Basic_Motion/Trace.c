@@ -1,6 +1,10 @@
 #include "Trace.h"
 
 extern float g_gyro_yaw;
+extern char buffer[100];
+
+//最小差速下限 (克服静摩擦力)
+const float  min_SPEED_SUB= 0.1;
 
 //新思路循迹
 void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, float speed_add, float yaw_current)
@@ -56,11 +60,71 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
     }
 
     Motor_Set_Speed_Both(0, 0);
-    Rotate(0.4, yaw_target);
+    //Rotate(0.4, yaw_target);
     //DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
 }
 
-void Rotate(float speed, float yaw_target)
+void Rotate(Track_Clock dir, float speed, float yaw_target)
 {
+    float left_speed = 0;
+    float right_speed = 0;
+    float speed_sub = 0;
+    float error = 0;
+    float yaw_current = 0;
+    float last_error = 0;
 
+    /* 速度限幅 */
+    if (speed > 0.6f) speed = 0.6f;
+    if (speed < 0.0f) speed = 0.0f;
+
+    /* --- Bug Fix: yaw_target 归一化到 [-180, 180] ---
+     * 原来写的是 "yaw_target > yaw_target+180" 永远为假, 归一化是空操作 */
+    if (yaw_target > 180.0f)  yaw_target -= 360.0f;
+    if (yaw_target < -180.0f) yaw_target += 360.0f;
+
+    do
+    {
+        /* 取当前 yaw, 并解开角度环绕使它与 yaw_target 在同一圈 */
+        yaw_current = g_gyro_yaw;
+        if (yaw_current > yaw_target + 180.0f) yaw_current -= 360.0f;
+        if (yaw_current < yaw_target - 180.0f) yaw_current += 360.0f;
+
+        error = yaw_target - yaw_current;
+
+        /* PD 控制器: P=0.5/180, D=0.0001 */
+        speed_sub = 0.5f / 180.0f * error + 0.0001f * (error - last_error);
+
+        if (speed_sub > 0.0f && speed_sub < min_SPEED_SUB) speed_sub = min_SPEED_SUB;
+        if (speed_sub < 0.0f && speed_sub > -min_SPEED_SUB) speed_sub = -min_SPEED_SUB;
+
+        if (error > 0.0f)
+        {
+            /* 目标在 CCW 方向: 右轮快 → 逆时针转 → yaw ↑ */
+            left_speed  = speed;
+            right_speed = speed + speed_sub;
+        }
+        else
+        {
+            /* 目标在 CW 方向(或已超过): 左轮快 → 顺时针转 → yaw ↓
+             * speed_sub <= 0, 所以 -speed_sub >= 0, 左轮加速 */
+            left_speed  = speed - speed_sub;   
+            right_speed = speed;
+        }
+
+        Motor_Set_Speed_Both(left_speed, right_speed);
+
+        last_error = error;
+
+        sprintf((char*)buffer, "yaw=%lf \r\n", yaw_current);
+        uart_pc_send_string(buffer);
+
+        sprintf((char*)buffer, "speed_sub=%lf \r\n", speed_sub);
+        uart_pc_send_string(buffer);
+
+        mspm0_delay_ms(100);
+
+    } while (error > 0.5f || error < -0.5f);   /* Fix: 双向判断, 防止 overshoot 后直接退出 */
+
+    Motor_Set_Speed_Both(0, 0);
+    mspm0_delay_ms(200);
 }

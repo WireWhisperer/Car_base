@@ -6,9 +6,11 @@ extern int16_t Motor_Left_Journey;
 extern int16_t Motor_Right_Journey;
 
 const float kp = 0.05;
-const float ki = 0.02;
-const float duty_max = 0.5;  //正向占空比限幅
-const float duty_min = -0.0;  //反向占空比限幅
+const float ki = 0.01;
+const float duty_max = 0.6;  //正向占空比限幅
+const float duty_min = -0.6;  //反向占空比限幅
+const float speed_max = 0.5;
+const float speed_min = -0.5;
 
 extern char buffer[100];
 
@@ -100,14 +102,19 @@ void Motor_Set_Speed(MotorId id, float target_speed)
             case MOTOR_LEFT:
                 Motor_Left_PID.pid_en = false;
                 Motor_Left_PID.Target_Speed = 0;
+                Motor_Set_Duty(MOTOR_LEFT, 0);
                 break;
             case MOTOR_RIGHT:
                 Motor_Right_PID.pid_en = false;
                 Motor_Right_PID.Target_Speed = 0;
+                Motor_Set_Duty(MOTOR_RIGHT, 0);
                 break;
         }
         return;
     }
+    
+    if (target_speed > speed_max) target_speed = speed_max;
+    if (target_speed < speed_min) target_speed = speed_min;
     switch (id)
     {
         case MOTOR_LEFT:

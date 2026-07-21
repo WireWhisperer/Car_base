@@ -22,5 +22,6 @@
 #include <stdio.h>
 #include "gray_with_MCU.h"
 #include "Gyroscope.h"
+#include "Trace.h"
 
 #endif  /* #ifndef _MAIN_H_ */
