@@ -32,8 +32,8 @@ int main(void)
 
     DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
 
-    Rect_trace(Clockwise, 0.2, 0.08);
-    Motor_Set_Speed_Both(0.0, 0.0);
+    Rect_DUTY_trace(Clockwise, 0.2, 0.2, 0.05);
+    Motor_Set_Duty_Both(0.0, 0.0);
     
     BUTTON_1_IS_PRESSED = 0;
 

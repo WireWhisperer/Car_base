@@ -27,6 +27,8 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
 bool meet_Rect(void);
 
 //对矩形框循迹
-void Rect_trace(Track_Clock dir, float speed, float speed_add);
+void Rect_PID_trace(Track_Clock dir, float speed, float speed_add);
+//使用占空比循迹
+void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add);
 
 #endif

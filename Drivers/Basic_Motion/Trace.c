@@ -27,15 +27,15 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
         if (yaw_missed > 180) yaw_missed -= 360;
         if (yaw_missed < -180) yaw_missed += 360;
 
-        if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Speed_Both(left_speed, right_speed + 4*speed_add);
-        if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Speed_Both(left_speed, right_speed + 3*speed_add);
-        if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Speed_Both(left_speed, right_speed + 2*speed_add);
-        if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Speed_Both(left_speed, right_speed + 1*speed_add);
-        if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Speed_Both(left_speed, right_speed);
-        if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Speed_Both(left_speed + speed_add, right_speed);
-        if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Speed_Both(left_speed + 2*speed_add, right_speed);
-        if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Speed_Both(left_speed + 3*speed_add, right_speed);
-        if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Speed_Both(left_speed + 4*speed_add, right_speed);
+        if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Duty_Both(left_speed, right_speed + 4*speed_add);
+        if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Duty_Both(left_speed, right_speed + 3*speed_add);
+        if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Duty_Both(left_speed, right_speed + 2*speed_add);
+        if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Duty_Both(left_speed, right_speed + 1*speed_add);
+        if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Duty_Both(left_speed, right_speed);
+        if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Duty_Both(left_speed + speed_add, right_speed);
+        if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Duty_Both(left_speed + 2*speed_add, right_speed);
+        if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Duty_Both(left_speed + 3*speed_add, right_speed);
+        if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Duty_Both(left_speed + 4*speed_add, right_speed);
 
         //sprintf((char*)oled_buffer, "miss: %f", yaw_missed);
         //OLED_ShowString(0, 2, oled_buffer, 8);
@@ -50,7 +50,7 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
                 right_speed /= 3;
                 speed_add /= 3;
                 have_closed = 1;
-                Motor_Set_Speed_Both(0, 0);
+                Motor_Set_Duty_Both(0, 0);
                 mspm0_delay_ms(100);
             }
         }
@@ -59,7 +59,7 @@ void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, floa
         mspm0_delay_ms(10);
     }
 
-    Motor_Set_Speed_Both(0, 0);
+    Motor_Set_Duty_Both(0, 0);
     //Rotate(0.4, yaw_target);
     //DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
 }
@@ -142,7 +142,8 @@ bool meet_Rect(void)
     return flag;
 }
 
-void Rect_trace(Track_Clock dir, float speed, float speed_add)
+//左摇右晃十分差劲
+void Rect_PID_trace(Track_Clock dir, float speed, float speed_add)
 {
     double angle_miss = 0;//灰度传感器的当前与切线偏移角度
     uint8_t have_closed = 0;
@@ -167,6 +168,37 @@ void Rect_trace(Track_Clock dir, float speed, float speed_add)
         }while(!meet_Rect());
         float spin_yaw_target = dir ? g_gyro_yaw + 90 : g_gyro_yaw - 90;
         Rotate(dir, 0.05, spin_yaw_target);
+    }
+    
+}
+
+void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add)
+{
+    double angle_miss = 0;//灰度传感器的当前与切线偏移角度
+    uint8_t have_closed = 0;
+    Motor_Left_PID.pid_en = false;
+    Motor_Right_PID.pid_en = false;
+
+    while(1)
+    {
+        Motor_Set_Duty_Both(left_duty, right_duty);
+        do
+        {
+            angle_miss = get_miss_theta(dir);
+
+            if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Duty_Both(left_duty + 4*duty_add, right_duty);
+            if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Duty_Both(left_duty + 3*duty_add, right_duty);
+            if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Duty_Both(left_duty + 2*duty_add, right_duty);
+            if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Duty_Both(left_duty + 1*duty_add, right_duty);
+            if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Duty_Both(left_duty, right_duty);
+            if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Duty_Both(left_duty, right_duty + duty_add);
+            if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Duty_Both(left_duty, right_duty + 2*duty_add);
+            if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Duty_Both(left_duty, right_duty + 3*duty_add);
+            if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Duty_Both(left_duty, right_duty + 4*duty_add);
+            mspm0_delay_ms(50);
+        }while(!meet_Rect());
+        float spin_yaw_target = dir ? g_gyro_yaw + 90 : g_gyro_yaw - 90;
+        Rotate(dir, 0.0, spin_yaw_target);
     }
     
 }
