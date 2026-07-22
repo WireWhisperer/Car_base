@@ -5,7 +5,6 @@ float yaw = 0.f;
 
 void uart_pc_Init(void)
 {
-    SYSCFG_DL_init();
     //清除串口中断标志
     NVIC_ClearPendingIRQ(UART_PC_INST_INT_IRQN);
     //使能串口中断

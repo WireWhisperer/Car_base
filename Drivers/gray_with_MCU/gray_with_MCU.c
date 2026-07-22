@@ -146,7 +146,7 @@ double get_miss_theta(Track_Clock dir)
     Zero_Mid = (float)(Zero_Left + Zero_Right) / 2;
     double angle = atan((4.5 - Zero_Mid) / 16) * 180 / M_PI;
 
-    if (gray_status == 0xff) angle = dir ? -11 : 11;
+    if (gray_status == 0xff) angle = dir ? 11 : -11;
 
     if (angle > 11) angle = 11;
     if (angle < -11) angle = -11;
