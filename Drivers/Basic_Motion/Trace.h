@@ -23,4 +23,10 @@ void Rotate(Track_Clock dir, float speed, float yaw_target);
 
 void Patrol_Trace(Track_Clock spin_dir,float left_speed, float right_speed, float speed_add, float yaw_current);
 
+//检查是否碰到矩形角或出线
+bool meet_Rect(void);
+
+//对矩形框循迹
+void Rect_trace(Track_Clock dir, float speed, float speed_add);
+
 #endif

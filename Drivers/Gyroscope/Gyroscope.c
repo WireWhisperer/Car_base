@@ -102,6 +102,17 @@ void Gyroscope_Init(void)
     DL_DMA_setTransferSize(DMA, DMA_Gyro_CHAN_ID, DMA_TRANSFER_SIZE);
     DL_DMA_enableChannel(DMA, DMA_Gyro_CHAN_ID);
 
+    // 在使能 NVIC 前清除 UART3 的 pending 中断状态
+      DL_UART_Main_clearInterruptStatus(UART_Gyro_INST,
+          DL_UART_MAIN_INTERRUPT_RX_TIMEOUT_ERROR);
+      NVIC_ClearPendingIRQ(UART_Gyro_INST_INT_IRQN);
+      DL_UART_Main_clearInterruptStatus(UART_Gyro_INST,
+          DL_UART_MAIN_INTERRUPT_RX_TIMEOUT_ERROR);
+      NVIC_ClearPendingIRQ(UART_Gyro_INST_INT_IRQN);
+
+      // 清空 RX FIFO 中可能残留的数据
+      uint8_t dummy[4];
+      DL_UART_drainRXFIFO(UART_Gyro_INST, dummy, 4);
     /* 使能 NVIC 中断
      * (UART 外设层的 RX timeout 中断已由 SysConfig 生成代码使能) */
     NVIC_EnableIRQ(UART_Gyro_INST_INT_IRQN);

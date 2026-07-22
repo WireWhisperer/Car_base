@@ -177,9 +177,9 @@ SYSCTL.clockTreeEn           = true;
 
 TIMER1.$name            = "Motor_PID";
 TIMER1.timerMode        = "PERIODIC_UP";
-TIMER1.timerPeriod      = "50 ms";
 TIMER1.timerClkPrescale = 100;
 TIMER1.interrupts       = ["LOAD"];
+TIMER1.timerPeriod      = "10 ms";
 
 UART1.$name                            = "UART_PC";
 UART1.targetBaudRate                   = 115200;

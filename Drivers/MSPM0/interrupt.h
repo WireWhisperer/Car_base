@@ -20,14 +20,6 @@
 #include <stdio.h>
 #include "Motor.h"
 
-/*---- 编码器脉冲计数 (定时器中断中清零) ----*/
-
-/** 左轮编码器脉冲数, 编码器中断累加, PID 定时器中断归零 */
-extern int16_t Motor_Left_roll;
-
-/** 右轮编码器脉冲数, 编码器中断累加, PID 定时器中断归零 */
-extern int16_t Motor_Right_roll;
-
 /*---- 按键状态 (按键中断置位, 应用程序轮询清零) ----*/
 
 /** 按键 1 按下标志 (PA24) */

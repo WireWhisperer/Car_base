@@ -33,7 +33,7 @@
 #define ENCODER_WIRE_COUNT      260
 
 /** PID 控制周期 (ms), 定时器中断间隔 */
-#define PID_TIMER_PERIOD        50
+#define PID_TIMER_PERIOD        10
 
 /** 圆周率 */
 #define PI                      3.14f

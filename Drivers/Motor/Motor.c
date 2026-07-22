@@ -1,9 +1,9 @@
 #include "Motor.h"
 
-extern int16_t Motor_Left_roll;
-extern int16_t Motor_Right_roll;
-extern int16_t Motor_Left_Journey;
-extern int16_t Motor_Right_Journey;
+extern int32_t Motor_Left_roll;
+extern int32_t Motor_Right_roll;
+extern int32_t Motor_Left_Journey;
+extern int32_t Motor_Right_Journey;
 
 const float kp = 0.05;
 const float ki = 0.01;
@@ -163,23 +163,11 @@ void Motor_PID_Update_Single(Motor_PID_info* info)
         {
             case MOTOR_LEFT:
                 Motor_Set_Duty(MOTOR_LEFT, info->Current_Duty);
-                //调试
-                sprintf(buffer, "LeftSpeed:%f \n", Motor_Left_PID.Current_Speed);
-                uart_pc_send_string(buffer);
-                sprintf(buffer, "Lefterror:%f \n", Motor_Left_PID.Last_error);
-                uart_pc_send_string(buffer);
-                sprintf(buffer, "LeftDuty:%f \n", Motor_Left_PID.  Current_Duty);
-                uart_pc_send_string(buffer);
+                
                 break;
             case MOTOR_RIGHT:
                 Motor_Set_Duty(MOTOR_RIGHT, info->Current_Duty);
-                //调试
-                sprintf(buffer, "RightSpeed:%f \n", Motor_Right_PID.Current_Speed);
-                uart_pc_send_string(buffer);
-                sprintf(buffer, "Righterror:%f \n", Motor_Right_PID.Last_error);
-                uart_pc_send_string(buffer);
-                sprintf(buffer, "RightDuty:%f \n", Motor_Right_PID.Current_Duty);
-                uart_pc_send_string(buffer);
+                
                 break;
         }
         info->Last_error = current_error;

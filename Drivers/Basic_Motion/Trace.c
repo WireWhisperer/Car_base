@@ -128,3 +128,45 @@ void Rotate(Track_Clock dir, float speed, float yaw_target)
     Motor_Set_Speed_Both(0, 0);
     mspm0_delay_ms(200);
 }
+
+bool meet_Rect(void)
+{
+    uint8_t count = 0;
+    uint8_t gray_status = Get_Gray_Data();
+    bool flag = false;
+
+    for (int i = 0; i < 8; i++) if (!((gray_status >> i) & 0x1)) count++; //count记有几个0
+
+    if (count == 0 || count >= 3) flag = true;
+
+    return flag;
+}
+
+void Rect_trace(Track_Clock dir, float speed, float speed_add)
+{
+    double angle_miss = 0;//灰度传感器的当前与切线偏移角度
+    uint8_t have_closed = 0;
+
+    while(1)
+    {
+        Motor_Set_Speed_Both(speed, speed);
+        do
+        {
+            angle_miss = get_miss_theta(dir);
+
+            if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Speed_Both(speed + 4*speed_add, speed);
+            if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Speed_Both(speed + 3*speed_add, speed);
+            if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Speed_Both(speed + 2*speed_add, speed);
+            if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Speed_Both(speed + 1*speed_add, speed);
+            if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Speed_Both(speed, speed);
+            if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Speed_Both(speed, speed + speed_add);
+            if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Speed_Both(speed, speed + 2*speed_add);
+            if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Speed_Both(speed, speed + 3*speed_add);
+            if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Speed_Both(speed, speed + 4*speed_add);
+            mspm0_delay_ms(50);
+        }while(!meet_Rect());
+        float spin_yaw_target = dir ? g_gyro_yaw + 90 : g_gyro_yaw - 90;
+        Rotate(dir, 0.05, spin_yaw_target);
+    }
+    
+}

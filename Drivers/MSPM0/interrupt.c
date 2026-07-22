@@ -5,11 +5,11 @@
 volatile uint8_t BUTTON_1_IS_PRESSED = 0;
 volatile uint8_t BUTTON_2_IS_PRESSED = 0;
 
-int16_t Motor_Left_roll = 0;
-int16_t Motor_Right_roll = 0;
+int32_t Motor_Left_roll = 0;
+int32_t Motor_Right_roll = 0;
 
-int16_t Motor_Left_Journey = 0;
-int16_t Motor_Right_Journey = 0;
+int32_t Motor_Left_Journey = 0;
+int32_t Motor_Right_Journey = 0;
 
 extern char buffer[100];
 
