@@ -33,12 +33,69 @@ int main(void)
     while(!BUTTON_1_IS_PRESSED);
 
     BUTTON_1_IS_PRESSED = 0;
-    //Motor_Set_Duty_Both(0.2, 0.203);
+
+    uint16_t task = SelectTasks();
+    task = task*4;
+    
+    DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+    DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+    while (task > 0)
+    {
+        Rect_DUTY_trace(Anticlockwise, 0.2, 0.197, 0.03, 0.03, g_gyro_yaw);
+        DL_GPIO_togglePins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+        task--;
+    }
+    DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+    Motor_Set_Duty_Both(0.0, 0.0);
+
     while (1)
     {
         // data = Get_Gray_Data();
         // data1 = get_miss_theta(Clockwise);
-        Rect_DUTY_trace(Clockwise, 0.2, 0.203, 0.05, g_gyro_yaw);
+        // mspm0_delay_ms(100);
     }
-    Motor_Set_Duty_Both(0.0, 0.0);
+}
+
+//选择圈数
+uint8_t SelectTasks(void)
+{
+    uint8_t task = 0;
+    while(!BUTTON_2_IS_PRESSED)
+    {
+        if (BUTTON_1_IS_PRESSED)
+        {
+            BUTTON_1_IS_PRESSED = 0;
+            mspm0_delay_ms(150);
+            if (BUTTON_1_IS_PRESSED)
+            {
+                if (task == 3) task = 0;
+                else task++;
+                switch (task)
+                {
+                    case 0:
+                        DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+                        DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+                        break;
+                    case 1:
+                        DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+                        DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+                        break;
+                    case 2:
+                        DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+                        DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+                        break;
+                    case 3:
+                        DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+                        DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+                        break;
+                }
+            }
+        }
+    }
+    BUTTON_2_IS_PRESSED = 0;
+    mspm0_delay_ms(150);
+    while(BUTTON_2_IS_PRESSED);
+    DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+    DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
+    return (task+1);
 }

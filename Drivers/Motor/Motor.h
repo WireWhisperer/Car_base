@@ -27,7 +27,7 @@
 #define PWM_MOTOR_Period_Count  1000
 
 /** 轮胎直径 (mm) */
-#define TIRE_D                  48.5f
+#define TIRE_D                  65.0f
 
 /** 编码器每圈正向脉冲数 */
 #define ENCODER_WIRE_COUNT      260

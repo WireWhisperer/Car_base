@@ -29,6 +29,7 @@ bool meet_Rect(void);
 //对矩形框循迹
 void Rect_PID_trace(Track_Clock dir, float speed, float speed_add);
 //使用占空比循迹
-void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add, float yaw_current);
+void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add_left, float duty_add_right, float yaw_current);
+
 
 #endif

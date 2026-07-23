@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c ' *)",
+      "WebFetch(domain:www.ganv.com.cn)",
+      "WebFetch(domain:blog.csdn.net)"
+    ]
+  }
+}

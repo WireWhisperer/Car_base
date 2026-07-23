@@ -173,7 +173,7 @@ void Rect_PID_trace(Track_Clock dir, float speed, float speed_add)
     
 }
 
-void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add, float yaw_current)
+void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float duty_add_left, float duty_add_right, float yaw_current)
 {
     double angle_miss = 0;//灰度传感器的当前与切线偏移角度
     uint8_t have_closed = 0;
@@ -185,28 +185,47 @@ void Rect_DUTY_trace(Track_Clock dir, float left_duty, float right_duty, float d
     {
         angle_miss = get_miss_theta(dir);
 
-        if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Duty_Both(left_duty + 3*duty_add, right_duty - 2*duty_add);
-        if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Duty_Both(left_duty + 2*duty_add, right_duty - duty_add);
-        if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Duty_Both(left_duty + 2*duty_add, right_duty);
-        if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Duty_Both(left_duty + 1*duty_add, right_duty);
+        if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Duty_Both(left_duty - 2*duty_add_left, right_duty + 4*duty_add_right);
+        if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Duty_Both(left_duty - duty_add_left, right_duty + 3*duty_add_right);
+        if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Duty_Both(left_duty , right_duty + 2*duty_add_right);
+        if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Duty_Both(left_duty, right_duty + duty_add_right);
         if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Duty_Both(left_duty, right_duty);
-        if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Duty_Both(left_duty, right_duty + duty_add);
-        if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Duty_Both(left_duty, right_duty + 2*duty_add);
-        if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Duty_Both(left_duty - duty_add, right_duty + 2*duty_add);
-        if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Duty_Both(left_duty - 2*duty_add, right_duty + 3*duty_add);
-        mspm0_delay_ms(50);
-    }while(!meet_Rect() || (Motor_Left_Journey < 750 && Motor_Right_Journey < 750));
-    //Motor_Set_Duty_Both(0,0);
-    mspm0_delay_ms(100);
+        if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Duty_Both(left_duty + duty_add_left, right_duty);
+        if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Duty_Both(left_duty + 2*duty_add_left, right_duty);
+        if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Duty_Both(left_duty + 3*duty_add_left, right_duty - duty_add_right);
+        if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Duty_Both(left_duty + 4*duty_add_left, right_duty - 2*duty_add_right);
+        mspm0_delay_ms(30);
+     }while(!meet_Rect() || (Motor_Left_Journey < 800 && Motor_Right_Journey < 800));
 
-    //Motor_Set_Duty_Both(left_duty, right_duty);
-    //mspm0_delay_ms(200);
+    float spin_yaw_target = dir ? yaw_current + 90 : yaw_current - 90;
+    if (spin_yaw_target > 180) spin_yaw_target -= 360;
+    if (spin_yaw_target < -180) spin_yaw_target += 360;
 
-    // DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+    while(fabsf(g_gyro_yaw - spin_yaw_target) > 5)
+    //while(meet_Rect())
+    {
+        angle_miss = get_miss_theta(dir);
+
+        if ((angle_miss > -12) && (angle_miss <= -9)) Motor_Set_Duty_Both(left_duty - 4*duty_add_left, right_duty + 6*duty_add_right);
+        if ((angle_miss > -9) && (angle_miss <= -6)) Motor_Set_Duty_Both(left_duty - 2*duty_add_left, right_duty + 4*duty_add_right);
+        if ((angle_miss > -6) && (angle_miss <= -3)) Motor_Set_Duty_Both(left_duty , right_duty + 2*duty_add_right);
+        if ((angle_miss > -3) && (angle_miss <= -1)) Motor_Set_Duty_Both(left_duty, right_duty + duty_add_right);
+        if ((angle_miss > -1) && (angle_miss <= 1)) Motor_Set_Duty_Both(left_duty, right_duty);
+        if ((angle_miss > 1) && (angle_miss <= 3)) Motor_Set_Duty_Both(left_duty + duty_add_left, right_duty);
+        if ((angle_miss > 3) && (angle_miss <= 6)) Motor_Set_Duty_Both(left_duty + 2*duty_add_left, right_duty);
+        if ((angle_miss > 6) && (angle_miss <= 9)) Motor_Set_Duty_Both(left_duty + 4*duty_add_left, right_duty - 2*duty_add_right);
+        if ((angle_miss > 9) && (angle_miss <= 12)) Motor_Set_Duty_Both(left_duty + 6*duty_add_left, right_duty - 4*duty_add_right);
+        mspm0_delay_ms(10);
+    }
+    
+    // Motor_Set_Duty_Both(left_duty, right_duty);
+    // mspm0_delay_ms(200);
+
+    //DL_GPIO_setPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
     // float spin_yaw_target = dir ? yaw_current + 90 : yaw_current - 90;
     // Rotate(dir, 0.0, spin_yaw_target);
-    // Motor_Left_Journey = 0;
-    // Motor_Right_Journey = 0;
-    // DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
-    
+    Motor_Left_Journey = 0;
+    Motor_Right_Journey = 0;
+    // //DL_GPIO_clearPins(GPIO_LED_PORT, GPIO_LED_PIN_LED_RED_PIN);
+    // DL_GPIO_togglePins(GPIO_LED_PORT, GPIO_LED_PIN_LED_GREEN_PIN);
 }

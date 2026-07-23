@@ -24,4 +24,6 @@
 #include "Gyroscope.h"
 #include "Trace.h"
 
+uint8_t SelectTasks(void);
+
 #endif  /* #ifndef _MAIN_H_ */

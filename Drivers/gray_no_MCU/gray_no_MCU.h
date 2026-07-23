@@ -1,18 +1,3 @@
-/**
- * @file    gray_no_MCU.h
- * @brief   感为八路灰度传感器 GPIO 驱动 (非 I2C 模式)
- *
- * 通过 MSPM0 GPIO 模拟 3-to-8 多路选择器 (AD0/AD1/AD2) 依次读取
- * 8 路灰度传感器的数字输出 (OUT 引脚)。
- *
- * 硬件连接:
- *   AD0: PA0, AD1: PA2, AD2: PB9  (通道选择, OUTPUT)
- *   OUT: PB8  (传感器数字输出, INPUT)
- *
- * @note   此为 GPIO 轮询方式, 不使用 I2C。
- *         如需 I2C 控制模式请使用 gray_with_MCU 驱动。
- */
-
 #ifndef GREY_NO_MCU_H
 #define GREY_NO_MCU_H
 
@@ -23,6 +8,8 @@ typedef enum {
     Clockwise,       /**< 顺时针 */
     Anticlockwise    /**< 逆时针 */
 } Track_Clock;
+
+void Gray_Init(void);
 
 /**
  * @brief  读取 8 路灰度数字数据 (GPIO 轮询)
@@ -45,6 +32,6 @@ uint8_t Get_Gray_Data(void);
  * @param  dir  循迹方向
  * @return 偏差角度 (度), 范围 [-11°, +11°]
  */
-double get_track(Track_Clock dir);
+double get_miss_theta(Track_Clock dir);
 
 #endif /* GREY_NO_MCU_H */
